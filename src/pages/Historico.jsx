@@ -21,10 +21,11 @@ export default function Historico() {
   const [busca, setBusca]         = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [expandido, setExpandido] = useState(null);
-  const [modalId, setModalId]     = useState(null);
-  const [novoStatus, setNovoStatus]     = useState("Pago");
+  const [modalId, setModalId]         = useState(null);
+  const [valorRecebido, setValorRecebido] = useState("");
   const [dataPagamento, setDataPagamento] = useState("");
-  const [obs, setObs]             = useState("");
+  const [obs, setObs]                 = useState("");
+  const [erroModal, setErroModal]     = useState("");
 
   useEffect(() => {
     const salvas = localStorage.getItem(STORAGE_VENDAS);
@@ -44,9 +45,13 @@ export default function Historico() {
   });
 
   const totalGeral     = vendasFiltradas.reduce((acc, v) => acc + Number(v.total), 0);
-  const totalFiado     = vendasNormalizadas
+  // Saldo real = total - valorRecebido acumulado de cada venda
+  const totalAReceber = vendasNormalizadas
     .filter((v) => v.status === "Fiado" || v.status === "Pago Parcial")
-    .reduce((acc, v) => acc + Number(v.total), 0);
+    .reduce((acc, v) => {
+      const saldo = Number(v.total) - Number(v.valorRecebido || 0);
+      return acc + saldo;
+    }, 0);
 
   function salvarVendas(lista) {
     localStorage.setItem(STORAGE_VENDAS, JSON.stringify(lista));
@@ -55,23 +60,46 @@ export default function Historico() {
 
   function abrirModal(venda) {
     setModalId(venda.id);
-    setNovoStatus("Pago");
+    setValorRecebido("");
     setDataPagamento(new Date().toLocaleDateString("pt-BR"));
     setObs("");
+    setErroModal("");
   }
 
   function fecharModal() {
     setModalId(null);
+    setErroModal("");
   }
 
   function confirmarPagamento() {
+    const recebido = parseFloat(String(valorRecebido).replace(",", "."));
+    if (isNaN(recebido) || recebido <= 0) {
+      setErroModal("Informe um valor recebido válido.");
+      return;
+    }
+
+    const venda = vendasNormalizadas.find((v) => v.id === modalId);
+    const jaRecebido = Number(venda.valorRecebido || 0);
+    const novoTotalRecebido = jaRecebido + recebido;
+    const saldoRestante = Number(venda.total) - novoTotalRecebido;
+
+    if (recebido > saldoRestante + jaRecebido) {
+      setErroModal(`Valor maior que o saldo restante (R$ ${(Number(venda.total) - jaRecebido).toFixed(2).replace(".", ",")}).`);
+      return;
+    }
+
+    const novoStatus = saldoRestante <= 0.001 ? "Pago" : "Pago Parcial";
+
     const atualizadas = vendas.map((v) => {
       if (v.id !== modalId) return v;
       return {
         ...v,
         status: novoStatus,
-        dataPagamento: dataPagamento,
-        obsPagamento: obs,
+        valorRecebido: novoTotalRecebido,
+        dataPagamento: novoStatus === "Pago" ? dataPagamento : v.dataPagamento,
+        obsPagamento: obs
+          ? (v.obsPagamento ? v.obsPagamento + " | " : "") + obs
+          : v.obsPagamento,
       };
     });
     salvarVendas(atualizadas);
@@ -113,7 +141,7 @@ export default function Historico() {
           <div>
             <p style={estilos.cardLabel}>A Receber (Fiado)</p>
             <p style={{ ...estilos.cardValor, color: "#e74c3c" }}>
-              R$ {totalFiado.toFixed(2).replace(".", ",")}
+              R$ {totalAReceber.toFixed(2).replace(".", ",")}
             </p>
           </div>
         </div>
@@ -216,9 +244,16 @@ export default function Historico() {
                     <span style={estilos.vendaPagamento}>
                       {ICONE_PAGAMENTO[venda.pagamento] || "💳"} {venda.pagamento}
                     </span>
-                    <span style={{ ...estilos.vendaTotal, color: cfg.cor }}>
-                      R$ {Number(venda.total).toFixed(2).replace(".", ",")}
-                    </span>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ ...estilos.vendaTotal, color: cfg.cor }}>
+                        R$ {Number(venda.total).toFixed(2).replace(".", ",")}
+                      </span>
+                      {(venda.status === "Fiado" || venda.status === "Pago Parcial") && (
+                        <div style={{ fontSize: "12px", color: "#e74c3c", marginTop: "2px" }}>
+                          Saldo: R$ {(Number(venda.total) - Number(venda.valorRecebido || 0)).toFixed(2).replace(".", ",")}
+                        </div>
+                      )}
+                    </div>
 
                     {eFiado && (
                       <button
@@ -291,23 +326,36 @@ export default function Historico() {
           <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
             <h2 style={estilos.modalTitulo}>💰 Receber Pagamento</h2>
             <p style={estilos.modalCliente}>Cliente: <strong>{vendaModal.cliente}</strong></p>
-            <p style={estilos.modalValor}>
-              Valor: <strong>R$ {Number(vendaModal.total).toFixed(2).replace(".", ",")}</strong>
-            </p>
+            <div style={estilos.resumoModal}>
+              <div>
+                <span style={estilos.resumoLabel}>Total da venda</span>
+                <span style={estilos.resumoValor}>R$ {Number(vendaModal.total).toFixed(2).replace(".", ",")}</span>
+              </div>
+              <div>
+                <span style={estilos.resumoLabel}>Já recebido</span>
+                <span style={{ ...estilos.resumoValor, color: "#27ae60" }}>
+                  R$ {Number(vendaModal.valorRecebido || 0).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+              <div>
+                <span style={estilos.resumoLabel}>Saldo restante</span>
+                <span style={{ ...estilos.resumoValor, color: "#e74c3c" }}>
+                  R$ {(Number(vendaModal.total) - Number(vendaModal.valorRecebido || 0)).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+            </div>
 
             <div style={estilos.modalCampo}>
-              <label style={estilos.label}>Novo Status</label>
-              <div style={estilos.statusOpcoes}>
-                {["Pago", "Pago Parcial"].map((s) => (
-                  <button
-                    key={s}
-                    style={novoStatus === s ? estilos.btnStatusAtivo : estilos.btnStatus}
-                    onClick={() => setNovoStatus(s)}
-                  >
-                    {STATUS_CONFIG[s].label}
-                  </button>
-                ))}
-              </div>
+              <label style={estilos.label}>Valor Recebido Agora (R$) *</label>
+              <input
+                style={estilos.input}
+                value={valorRecebido}
+                onChange={(e) => { setValorRecebido(e.target.value); setErroModal(""); }}
+                placeholder="Ex: 100,00"
+                type="number"
+                min="0"
+                step="0.01"
+              />
             </div>
 
             <div style={estilos.modalCampo}>
@@ -329,6 +377,8 @@ export default function Historico() {
                 placeholder="Ex: Pagou R$50 em dinheiro..."
               />
             </div>
+
+            {erroModal && <p style={estilos.erroModal}>{erroModal}</p>}
 
             <div style={estilos.modalBotoes}>
               <button style={estilos.btnConfirmar} onClick={confirmarPagamento}>
@@ -626,5 +676,22 @@ const estilos = {
     padding: "11px",
     fontSize: "14px",
     cursor: "pointer",
+  },
+  resumoModal: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    background: "#f8f9fa",
+    borderRadius: "10px",
+    padding: "14px 16px",
+    marginBottom: "18px",
+  },
+  resumoLabel: { fontSize: "12px", color: "#888", display: "block" },
+  resumoValor: { fontSize: "16px", fontWeight: "700", color: "#2c3e50" },
+  erroModal: {
+    color: "#c0392b",
+    fontSize: "13px",
+    marginBottom: "8px",
+    fontWeight: "500",
   },
 };
