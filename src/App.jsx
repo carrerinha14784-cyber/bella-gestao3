@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import Produtos from './pages/Produtos.jsx';
 import Clientes from './pages/Clientes.jsx';
 import Vendas from './pages/Vendas.jsx';
+import Historico from './pages/Historico.jsx';
 import './styles.css';
 
 const abas = [
   { id: 'produtos', label: '📦 Produtos' },
   { id: 'clientes', label: '👥 Clientes' },
   { id: 'vendas',   label: '🛒 Vendas'   },
+  { id: 'historico', label: '📊 Histórico' },
 ];
 
 export default function App() {
@@ -40,6 +42,7 @@ export default function App() {
         {abaAtiva === 'produtos' && <Produtos />}
         {abaAtiva === 'clientes' && <Clientes />}
         {abaAtiva === 'vendas'   && <Vendas />}
+        {abaAtiva === 'historico' && <Historico />}
       </main>
     </div>
   );
