@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import Produtos from './pages/Produtos.jsx';
 import Clientes from './pages/Clientes.jsx';
+import Vendas from './pages/Vendas.jsx';
 import './styles.css';
 
 const abas = [
   { id: 'produtos', label: '📦 Produtos' },
   { id: 'clientes', label: '👥 Clientes' },
+  { id: 'vendas',   label: '🛒 Vendas'   },
 ];
 
 export default function App() {
-  const [abaAtiva, setAbaAtiva] = useState('produtos');
+  const [abaAtiva, setAbaAtiva] = useState('vendas');
 
   return (
     <div style={estilos.app}>
@@ -37,6 +39,7 @@ export default function App() {
       <main style={estilos.main}>
         {abaAtiva === 'produtos' && <Produtos />}
         {abaAtiva === 'clientes' && <Clientes />}
+        {abaAtiva === 'vendas'   && <Vendas />}
       </main>
     </div>
   );
