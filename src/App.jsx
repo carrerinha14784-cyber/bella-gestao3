@@ -22,6 +22,6 @@ export default function App(){
     {page==='vendas' && <Vendas />}
     {page==='historico' && <Historico />}
    </main>
-  </div>
+  </div> 
  )
 }
