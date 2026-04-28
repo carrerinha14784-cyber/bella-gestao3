@@ -15,7 +15,7 @@ function gerarAnos(vendas) {
   const anos = new Set(
     vendas.map((v) => {
       const partes = v.data?.split("/");
-      return partes?.[2]?.split(" ")?.[0] || "";
+      return partes?.[2]?.split(" ")?.[0]?.replace(",", "") || "";
     }).filter(Boolean)
   );
   if (anos.size === 0) {
@@ -44,7 +44,7 @@ export default function Relatorios() {
     const partes = v.data?.split("/");
     if (!partes || partes.length < 3) return false;
     const mes  = parseInt(partes[1], 10) - 1;
-    const ano  = partes[2]?.split(" ")?.[0];
+    const ano  = partes[2]?.split(" ")?.[0]?.replace(",", "");
     if (modo === "mensal") return mes === mesSel && ano === anoSel;
     return ano === anoSel;
   });
@@ -75,7 +75,7 @@ export default function Relatorios() {
       const partes = v.data?.split("/");
       if (!partes || partes.length < 3) return false;
       const mes = parseInt(partes[1], 10) - 1;
-      const ano = partes[2]?.split(" ")?.[0];
+      const ano = partes[2]?.split(" ")?.[0]?.replace(",", "");
       return mes === idx && ano === anoSel;
     });
     const total = vMes.reduce((a, v) => a + Number(v.total), 0);
