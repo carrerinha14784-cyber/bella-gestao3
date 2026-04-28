@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 const STORAGE_KEY = "bella_produtos";
 const ESTOQUE_BAIXO = 5;
 
-const categorias = ["Vestuário", "Calçados", "Acessórios", "Bolsas", "Outros"];
+const categorias = ["Roupa", "Tupperware", "Calçados", "Acessórios", "Bolsas", "Outros"];
 const cores = ["Preto", "Branco", "Azul", "Vermelho", "Verde", "Rosa", "Amarelo", "Cinza", "Bege", "Outro"];
 const tamanhos = ["PP", "P", "M", "G", "GG", "XG", "Único", "34", "35", "36", "37", "38", "39", "40", "41", "42"];
 
@@ -33,9 +33,14 @@ export default function Produtos() {
     setProdutos(lista);
   }
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+function handleChange(e) {
+  const { name, value } = e.target;
+  if (name === "categoria") {
+    setForm({ ...form, categoria: value, tamanho: "" });
+  } else {
+    setForm({ ...form, [name]: value });
   }
+}
 
   function validar() {
     if (!form.nome.trim()) return "Informe o nome do produto.";
@@ -141,12 +146,24 @@ export default function Produtos() {
           </div>
 
           <div style={estilos.campo}>
-            <label style={estilos.label}>Tamanho *</label>
-            <select style={estilos.input} name="tamanho" value={form.tamanho} onChange={handleChange}>
-              <option value="">Selecione...</option>
-              {tamanhos.map((t) => <option key={t}>{t}</option>)}
-            </select>
-          </div>
+  <label style={estilos.label}>
+    {form.categoria === "Tupperware" ? "Capacidade" : "Tamanho *"}
+  </label>
+  {form.categoria === "Tupperware" ? (
+    <input
+      style={estilos.input}
+      name="tamanho"
+      value={form.tamanho}
+      onChange={handleChange}
+      placeholder="Ex: 500ml, 1L, 2L..."
+    />
+  ) : (
+    <select style={estilos.input} name="tamanho" value={form.tamanho} onChange={handleChange}>
+      <option value="">Selecione...</option>
+      {tamanhos.map((t) => <option key={t}>{t}</option>)}
+    </select>
+  )}
+</div>
 
           <div style={estilos.campo}>
             <label style={estilos.label}>Estoque *</label>
