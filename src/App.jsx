@@ -3,6 +3,7 @@ import Produtos from './pages/Produtos.jsx';
 import Clientes from './pages/Clientes.jsx';
 import Vendas from './pages/Vendas.jsx';
 import Historico from './pages/Historico.jsx';
+import Relatorios from './pages/Relatorios.jsx';
 import './styles.css';
 
 const abas = [
@@ -10,6 +11,7 @@ const abas = [
   { id: 'clientes', label: '👥 Clientes' },
   { id: 'vendas',   label: '🛒 Vendas'   },
   { id: 'historico', label: '📊 Histórico' },
+  { id: 'relatorios', label: '📋 Relatórios' },
 ];
 
 export default function App() {
@@ -43,6 +45,7 @@ export default function App() {
         {abaAtiva === 'clientes' && <Clientes />}
         {abaAtiva === 'vendas'   && <Vendas />}
         {abaAtiva === 'historico' && <Historico />}
+        {abaAtiva === 'relatorios' && <Relatorios />}
       </main>
     </div>
   );
