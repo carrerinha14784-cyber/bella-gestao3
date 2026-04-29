@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-
-const STORAGE_KEY = "bella_clientes";
+import { supabase } from "../supabaseClient.js";
 
 const clienteVazio = {
   nome: "",
@@ -17,21 +16,26 @@ function formatarTelefone(valor) {
 }
 
 export default function Clientes() {
-  const [clientes, setClientes] = useState([]);
-  const [form, setForm] = useState(clienteVazio);
+  const [clientes, setClientes]     = useState([]);
+  const [form, setForm]             = useState(clienteVazio);
   const [editandoId, setEditandoId] = useState(null);
-  const [busca, setBusca] = useState("");
-  const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
+  const [busca, setBusca]           = useState("");
+  const [erro, setErro]             = useState("");
+  const [sucesso, setSucesso]       = useState("");
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    const salvos = localStorage.getItem(STORAGE_KEY);
-    if (salvos) setClientes(JSON.parse(salvos));
+    carregarClientes();
   }, []);
 
-  function salvarStorage(lista) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
-    setClientes(lista);
+  async function carregarClientes() {
+    setCarregando(true);
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error) setClientes(data || []);
+    setCarregando(false);
   }
 
   function handleChange(e) {
@@ -49,38 +53,54 @@ export default function Clientes() {
     return "";
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const msgErro = validar();
     if (msgErro) { setErro(msgErro); return; }
     setErro("");
 
+    const payload = {
+      nome:        form.nome.trim(),
+      telefone:    form.telefone,
+      observacoes: form.observacoes,
+    };
+
     if (editandoId !== null) {
-      const atualizados = clientes.map((c) =>
-        c.id === editandoId ? { ...form, id: editandoId } : c
-      );
-      salvarStorage(atualizados);
+      const { error } = await supabase
+        .from("clientes")
+        .update(payload)
+        .eq("id", editandoId);
+      if (error) { setErro("Erro ao atualizar cliente."); return; }
       setSucesso("Cliente atualizado com sucesso!");
       setEditandoId(null);
     } else {
-      const novo = { ...form, id: Date.now() };
-      salvarStorage([...clientes, novo]);
+      const { error } = await supabase
+        .from("clientes")
+        .insert([payload]);
+      if (error) { setErro("Erro ao cadastrar cliente."); return; }
       setSucesso("Cliente cadastrado com sucesso!");
     }
 
     setForm(clienteVazio);
+    carregarClientes();
     setTimeout(() => setSucesso(""), 3000);
   }
 
   function handleEditar(cliente) {
-    setForm({ ...cliente });
+    setForm({
+      nome:        cliente.nome,
+      telefone:    cliente.telefone,
+      observacoes: cliente.observacoes || "",
+    });
     setEditandoId(cliente.id);
     setErro("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleExcluir(id) {
+  async function handleExcluir(id) {
     if (!window.confirm("Deseja excluir este cliente?")) return;
-    salvarStorage(clientes.filter((c) => c.id !== id));
+    const { error } = await supabase.from("clientes").delete().eq("id", id);
+    if (error) { setErro("Erro ao excluir cliente."); return; }
+    carregarClientes();
   }
 
   function handleCancelar() {
@@ -98,7 +118,6 @@ export default function Clientes() {
     <div style={estilos.pagina}>
       <h1 style={estilos.titulo}>👥 Clientes</h1>
 
-      {/* Formulário */}
       <div style={estilos.card}>
         <h2 style={estilos.subtitulo}>
           {editandoId ? "✏️ Editar Cliente" : "➕ Novo Cliente"}
@@ -154,7 +173,6 @@ export default function Clientes() {
         </div>
       </div>
 
-      {/* Tabela */}
       <div style={estilos.card}>
         <div style={estilos.cabecalhoTabela}>
           <h2 style={{ ...estilos.subtitulo, marginBottom: 0 }}>
@@ -168,9 +186,11 @@ export default function Clientes() {
           />
         </div>
 
-        {clientesFiltrados.length === 0 ? (
+        {carregando ? (
+          <p style={estilos.vazio}>Carregando...</p>
+        ) : clientesFiltrados.length === 0 ? (
           <p style={estilos.vazio}>
-            {busca ? "Nenhum cliente encontrado para essa busca." : "Nenhum cliente cadastrado ainda."}
+            {busca ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -191,12 +211,8 @@ export default function Clientes() {
                       {c.observacoes || "—"}
                     </td>
                     <td style={estilos.td}>
-                      <button style={estilos.btnEditar} onClick={() => handleEditar(c)}>
-                        Editar
-                      </button>
-                      <button style={estilos.btnExcluir} onClick={() => handleExcluir(c.id)}>
-                        Excluir
-                      </button>
+                      <button style={estilos.btnEditar} onClick={() => handleEditar(c)}>Editar</button>
+                      <button style={estilos.btnExcluir} onClick={() => handleExcluir(c.id)}>Excluir</button>
                     </td>
                   </tr>
                 ))}
@@ -210,123 +226,26 @@ export default function Clientes() {
 }
 
 const estilos = {
-  pagina: {
-    padding: "24px",
-    maxWidth: "1100px",
-    margin: "0 auto",
-    fontFamily: "'Segoe UI', sans-serif",
-  },
-  titulo: {
-    fontSize: "28px",
-    fontWeight: "700",
-    color: "#2c3e50",
-    marginBottom: "20px",
-  },
-  subtitulo: {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#34495e",
-    marginBottom: "16px",
-  },
-  card: {
-    background: "#fff",
-    borderRadius: "12px",
-    padding: "24px",
-    marginBottom: "24px",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-    gap: "16px",
-    marginBottom: "16px",
-  },
+  pagina: { padding: "24px", maxWidth: "1100px", margin: "0 auto", fontFamily: "'Segoe UI', sans-serif" },
+  titulo: { fontSize: "28px", fontWeight: "700", color: "#2c3e50", marginBottom: "20px" },
+  subtitulo: { fontSize: "18px", fontWeight: "600", color: "#34495e", marginBottom: "16px" },
+  card: { background: "#fff", borderRadius: "12px", padding: "24px", marginBottom: "24px", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "16px", marginBottom: "16px" },
   campo: { display: "flex", flexDirection: "column", gap: "6px" },
   label: { fontSize: "13px", fontWeight: "600", color: "#555" },
-  input: {
-    padding: "10px 12px",
-    borderRadius: "8px",
-    border: "1px solid #ddd",
-    fontSize: "14px",
-    outline: "none",
-    fontFamily: "'Segoe UI', sans-serif",
-  },
+  input: { padding: "10px 12px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px", outline: "none", fontFamily: "'Segoe UI', sans-serif" },
   erro: { color: "#c0392b", fontSize: "13px", marginBottom: "8px" },
   sucessoMsg: { color: "#27ae60", fontSize: "13px", marginBottom: "8px" },
   botoes: { display: "flex", gap: "12px" },
-  btnPrimario: {
-    background: "#2c3e50",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    padding: "10px 24px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-  },
-  btnSecundario: {
-    background: "#ecf0f1",
-    color: "#555",
-    border: "none",
-    borderRadius: "8px",
-    padding: "10px 24px",
-    fontSize: "14px",
-    cursor: "pointer",
-  },
-  cabecalhoTabela: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "12px",
-    marginBottom: "16px",
-  },
-  busca: {
-    padding: "9px 14px",
-    borderRadius: "8px",
-    border: "1px solid #ddd",
-    fontSize: "14px",
-    outline: "none",
-    minWidth: "260px",
-  },
-  tabela: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "14px",
-  },
-  th: {
-    background: "#f4f6f8",
-    padding: "12px 14px",
-    textAlign: "left",
-    fontWeight: "600",
-    color: "#444",
-    borderBottom: "2px solid #e0e0e0",
-    whiteSpace: "nowrap",
-  },
+  btnPrimario: { background: "#2c3e50", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer" },
+  btnSecundario: { background: "#ecf0f1", color: "#555", border: "none", borderRadius: "8px", padding: "10px 24px", fontSize: "14px", cursor: "pointer" },
+  cabecalhoTabela: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" },
+  busca: { padding: "9px 14px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px", outline: "none", minWidth: "260px" },
+  tabela: { width: "100%", borderCollapse: "collapse", fontSize: "14px" },
+  th: { background: "#f4f6f8", padding: "12px 14px", textAlign: "left", fontWeight: "600", color: "#444", borderBottom: "2px solid #e0e0e0", whiteSpace: "nowrap" },
   tr: { borderBottom: "1px solid #f0f0f0" },
   td: { padding: "11px 14px", color: "#333", verticalAlign: "middle" },
-  btnEditar: {
-    background: "#3498db",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "6px 12px",
-    fontSize: "13px",
-    cursor: "pointer",
-    marginRight: "6px",
-  },
-  btnExcluir: {
-    background: "#e74c3c",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "6px 12px",
-    fontSize: "13px",
-    cursor: "pointer",
-  },
-  vazio: {
-    color: "#888",
-    textAlign: "center",
-    padding: "24px",
-  },
+  btnEditar: { background: "#3498db", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "13px", cursor: "pointer", marginRight: "6px" },
+  btnExcluir: { background: "#e74c3c", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "13px", cursor: "pointer" },
+  vazio: { color: "#888", textAlign: "center", padding: "24px" },
 };
